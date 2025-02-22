@@ -88,11 +88,22 @@ st.title("Student Performance Prediction App 🎓")
 
 # Load Data
 X, y = load_data()
+
+# Convert to DataFrame with column names
+feature_names = [f'feature_{i}' for i in range(X.shape[1])]  # Auto-generate feature names
+X = pd.DataFrame(X, columns=feature_names)
+
+# Standardize numerical features
 scaler = StandardScaler()
-X = scaler.fit_transform(X)
+X[num_cols] = scaler.fit_transform(X[num_cols])
+
+# Handle imbalance
 smote = SMOTE()
 X_smote, y_smote = smote.fit_resample(X, y)
+
+# Split dataset
 X_train, X_test, y_train, y_test = train_test_split(X_smote, y_smote, test_size=0.2, random_state=42)
+
 
 # Model Training and Evaluation
 if st.button("Train Models"):
@@ -124,8 +135,8 @@ if uploaded_file is not None:
     num_cols = X_user.select_dtypes(exclude=['object']).columns  # Numerical
 
     # Ensure numerical columns match training data
-    common_num_cols = list(set(num_cols) & set(X_train.columns))
-    if common_num_cols: 
+    common_num_cols = list(set(num_cols) & set(X_train.columns))  # Fixes error
+    if common_num_cols:
         X_user[common_num_cols] = scaler.transform(X_user[common_num_cols])  # Scale only matching features
 
     # Encode categorical features
