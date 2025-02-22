@@ -16,25 +16,36 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
-st.title("EduPredict 🎓 - Student Performance Predictor")
+st.title("📚 🎓 Khan-AcadPredict 🎓 📚")
 
-# GitHub Repository where CSV files are stored
-GITHUB_REPO = "https://github.com/yourusername/your-repo-name"  # <-- Change this
-GITHUB_RAW = "https://raw.githubusercontent.com/yourusername/your-repo-name/main/"  # <-- Change this
+# GitHub Repository Information
+GITHUB_USER = "rafaqatkhan-ai"
+GITHUB_REPO = "learning-feedback"
+GITHUB_RAW = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/"
 
-# Function to get available datasets from GitHub
+# Function to fetch CSV files from GitHub repository
 @st.cache_data
-def get_available_datasets():
-    return ["student_data1.csv", "student_data2.csv", "student_data3.csv"]  # <-- Update with actual CSV file names
+def get_github_csv_files():
+    repo_api = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/"
+    response = requests.get(repo_api)
+
+    if response.status_code == 200:
+        files = response.json()
+        csv_files = [file['name'] for file in files if file['name'].endswith('.csv')]
+        return csv_files
+    else:
+        st.error("Failed to fetch CSV files from GitHub.")
+        return []
 
 # Function to load CSV from GitHub
 def load_data_from_github(file_name):
     url = GITHUB_RAW + file_name
     response = requests.get(url)
+    
     if response.status_code == 200:
         return pd.read_csv(StringIO(response.text))
     else:
-        st.error("Failed to load dataset from GitHub.")
+        st.error(f"Failed to load dataset: {file_name} from GitHub.")
         return None
 
 # Function to preprocess data
@@ -80,7 +91,7 @@ def train_models(X_train, X_test, y_train, y_test):
 
     return results
 
-# Function to train DNN model
+# Function to train Deep Neural Network
 def train_dnn(X_train, X_test, y_train, y_test):
     model = Sequential([
         Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
@@ -88,6 +99,7 @@ def train_dnn(X_train, X_test, y_train, y_test):
         Dense(64, activation='relu'),
         Dense(len(np.unique(y_train)), activation='softmax')
     ])
+
     model.compile(optimizer=Adam(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.fit(X_train, y_train, epochs=50, batch_size=16, verbose=0, validation_split=0.2)
 
@@ -100,26 +112,32 @@ def train_dnn(X_train, X_test, y_train, y_test):
         "F1 Score": f1_score(y_test, y_pred, average='weighted')
     }
 
-# Sidebar: Choose dataset source
+# Sidebar: Dataset selection
 st.sidebar.header("Select or Upload Dataset")
-dataset_choice = st.sidebar.selectbox("Choose a dataset:", ["Select from GitHub", "Upload a file"])
+dataset_source = st.sidebar.radio("Choose dataset source:", ["Select from GitHub", "Upload a file"])
 
-if dataset_choice == "Select from GitHub":
-    dataset_list = get_available_datasets()
-    selected_dataset = st.sidebar.selectbox("Available Datasets:", dataset_list)
+df = None  # Initialize empty dataframe
 
-    if selected_dataset:
-        df = load_data_from_github(selected_dataset)
-        if df is not None:
-            st.success(f"Loaded dataset: {selected_dataset}")
-elif dataset_choice == "Upload a file":
+if dataset_source == "Select from GitHub":
+    csv_files = get_github_csv_files()
+    
+    if csv_files:
+        selected_file = st.sidebar.selectbox("Available Datasets:", csv_files)
+        if selected_file:
+            df = load_data_from_github(selected_file)
+            st.success(f"Loaded dataset: {selected_file}")
+    else:
+        st.warning("No CSV files found in GitHub repository.")
+
+elif dataset_source == "Upload a file":
     uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
-    if uploaded_file:
+    
+    if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         st.success("Uploaded custom dataset!")
 
 # Process the dataset if loaded
-if 'df' in locals():
+if df is not None:
     X, y = preprocess_data(df)
 
     # Handle class imbalance using SMOTE
@@ -130,19 +148,19 @@ if 'df' in locals():
     X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
 
     # Train ML models
-    st.write("Training ML models, please wait...")
+    st.write("Training machine learning models, please wait...")
     model_results = train_models(X_train, X_test, y_train, y_test)
 
-    st.subheader("Evaluation Results for ML Models")
+    st.subheader("Evaluation Results for Machine Learning Models")
     for model, metrics in model_results.items():
         st.write(f"**{model}**")
         st.write(metrics)
 
-    # Train DNN
-    st.write("Training Deep Learning Model, please wait...")
+    # Train and evaluate DNN
+    st.write("Training deep learning model, please wait...")
     dnn_results = train_dnn(X_train, X_test, y_train, y_test)
 
-    st.subheader("Evaluation Results for DNN Model")
+    st.subheader("Evaluation Results for Deep Neural Network")
     st.write(dnn_results)
 
     st.success("Training & Evaluation Completed! 🎉")
