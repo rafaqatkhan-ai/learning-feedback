@@ -1,7 +1,7 @@
 streamlit
+scikit-learn
 pandas
 numpy
-scikit-learn
 imblearn
 xgboost
 lightgbm
