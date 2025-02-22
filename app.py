@@ -14,7 +14,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
-st.title("Khan-AcadPredict 📚 🎓")
+st.title("📚 🎓 📚 Khan-AcadPredict 📚 🎓 📚")
 
 # Function to preprocess data
 def preprocess_data(df):
