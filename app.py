@@ -24,14 +24,22 @@ st.title("📚 🎓 Khan-AcadPredict 🎓 📚")
 
 # Function to fetch CSV files from GitHub repository
 def fetch_github_csv_files():
-    response = requests.get(GITHUB_API_URL)
-    if response.status_code == 200:
-        files = response.json()
-        csv_files = [file['download_url'] for file in files if file['name'].endswith('.csv')]
-        return csv_files
-    else:
-        st.error(f"Failed to fetch files from GitHub: {response.status_code}")
-        return []
+    def fetch_files_from_path(path):
+        response = requests.get(f"{GITHUB_API_URL}{path}")
+        if response.status_code == 200:
+            files = response.json()
+            csv_files = []
+            for file in files:
+                if file['type'] == 'file' and file['name'].endswith('.csv'):
+                    csv_files.append(file['download_url'])
+                elif file['type'] == 'dir':
+                    csv_files.extend(fetch_files_from_path(file['path']))
+            return csv_files
+        else:
+            st.error(f"Failed to fetch files from GitHub: {response.status_code}")
+            return []
+
+    return fetch_files_from_path("main")  # Start from the 'main' directory
 
 # Load dataset (either from GitHub or uploaded file)
 st.sidebar.header("Select Dataset")
@@ -137,30 +145,33 @@ if st.session_state.df is not None:
     if st.button("Train Models"):
         st.write("### Training in Progress... ⏳")
         
-        # Preprocess data
-        X, y = preprocess_data(df)
+        try:
+            # Preprocess data
+            X, y = preprocess_data(df)
 
-        # Handle class imbalance using SMOTE
-        smote = SMOTE()
-        X_resampled, y_resampled = smote.fit_resample(X, y)
+            # Handle class imbalance using SMOTE
+            smote = SMOTE()
+            X_resampled, y_resampled = smote.fit_resample(X, y)
 
-        # Split data into training and testing sets
-        X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+            # Split data into training and testing sets
+            X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
 
-        # Train machine learning models
-        model_results = train_models(X_train, X_test, y_train, y_test)
+            # Train machine learning models
+            model_results = train_models(X_train, X_test, y_train, y_test)
 
-        # Display results
-        st.subheader("Evaluation Results for Machine Learning Models")
-        for model, metrics in model_results.items():
-            st.write(f"**{model}**")
-            st.write(metrics)
+            # Display results
+            st.subheader("Evaluation Results for Machine Learning Models")
+            for model, metrics in model_results.items():
+                st.write(f"**{model}**")
+                st.write(metrics)
 
-        # Train and evaluate Deep Neural Network
-        st.write("Training deep learning model, please wait... ⏳")
-        dnn_results = train_dnn(X_train, X_test, y_train, y_test)
+            # Train and evaluate Deep Neural Network
+            st.write("Training deep learning model, please wait... ⏳")
+            dnn_results = train_dnn(X_train, X_test, y_train, y_test)
 
-        st.subheader("Evaluation Results for Deep Neural Network")
-        st.write(dnn_results)
+            st.subheader("Evaluation Results for Deep Neural Network")
+            st.write(dnn_results)
 
-        st.success("🎉 Training Completed Successfully!")
+            st.success("🎉 Training Completed Successfully!")
+        except Exception as e:
+            st.error(f"An error occurred during training: {e}")
