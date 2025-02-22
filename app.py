@@ -115,23 +115,19 @@ uploaded_file = st.sidebar.file_uploader("Upload a CSV file for prediction", typ
 if uploaded_file is not None:
     user_data = pd.read_csv(uploaded_file)
 
-    # Drop the last column if it exists (assuming it's the target/output)
-    if user_data.shape[1] > X_train.shape[1]:  # More columns than expected
-        st.warning("Detected extra column (possibly the target/output). Dropping it automatically.")
-        user_data = user_data.iloc[:, :-1]  # Remove last column
+    # Automatically separate features and target
+    X_user = user_data.iloc[:, :-1]  # All columns except the last one
+    y_user = user_data.iloc[:, -1]   # Only the last column (target)
 
-    # Ensure the number of features is correct
-    expected_features = X_train.shape[1]
-    
-    if user_data.shape[1] != expected_features:
-        st.error(f"Uploaded file has {user_data.shape[1]} features, but expected {expected_features}. Please check your file.")
-    else:
-        user_data = scaler.transform(user_data)  # Apply scaling
+    # Apply the same scaling as training data
+    X_user = scaler.transform(X_user)
 
-        # Load trained model and predict
-        model = XGBClassifier()
-        model.fit(X_train, y_train)  # Train model (consider saving/loading model instead)
-        prediction = model.predict(user_data)
+    # Train the model (consider saving/loading the trained model instead)
+    model = XGBClassifier()
+    model.fit(X_train, y_train)  # Retraining the model
 
-        st.write("Predicted Class:", prediction)
+    # Predict using the model
+    predictions = model.predict(X_user)
+
+    st.write("Predicted Class:", predictions)
 
