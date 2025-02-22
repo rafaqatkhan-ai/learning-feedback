@@ -115,12 +115,30 @@ uploaded_file = st.sidebar.file_uploader("Upload a CSV file for prediction", typ
 if uploaded_file is not None:
     user_data = pd.read_csv(uploaded_file)
 
-    # Automatically separate features and target
-    X_user = user_data.iloc[:, :-1]  # All columns except the last one
-    y_user = user_data.iloc[:, -1]   # Only the last column (target)
+    # Separate features (X_user) and target (y_user)
+    X_user = user_data.iloc[:, :-1]  # All columns except last one
+    y_user = user_data.iloc[:, -1]   # Last column as target (not used in prediction)
 
-    # Apply the same scaling as training data
-    X_user = scaler.transform(X_user)
+    # Identify categorical and numerical columns
+    cat_cols = X_user.select_dtypes(include=['object']).columns  # Categorical columns
+    num_cols = X_user.select_dtypes(exclude=['object']).columns  # Numerical columns
+
+    # Apply transformations
+    if len(num_cols) > 0:
+        X_user[num_cols] = scaler.transform(X_user[num_cols])  # Standardize numerical data
+
+    if len(cat_cols) > 0:
+        encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
+        X_user_cat = pd.DataFrame(encoder.fit_transform(X_user[cat_cols]))  # One-hot encode
+        X_user_cat.columns = encoder.get_feature_names_out(cat_cols)  # Keep column names
+        X_user = X_user.drop(columns=cat_cols).reset_index(drop=True)  # Drop original categorical columns
+        X_user = pd.concat([X_user, X_user_cat], axis=1)  # Merge with encoded columns
+
+    # Ensure all columns match the trained model
+    missing_cols = set(X_train.shape[1]) - set(X_user.shape[1])
+    for col in missing_cols:
+        X_user[col] = 0  # Add missing columns with 0s
+    X_user = X_user[X_train.columns]  # Ensure correct column order
 
     # Train the model (consider saving/loading the trained model instead)
     model = XGBClassifier()
@@ -130,4 +148,3 @@ if uploaded_file is not None:
     predictions = model.predict(X_user)
 
     st.write("Predicted Class:", predictions)
-
