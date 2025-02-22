@@ -24,17 +24,16 @@ GITHUB_REPO = "learning-feedback"
 GITHUB_RAW = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/"
 
 # Function to fetch CSV files from GitHub repository
-@st.cache_data
 def get_github_csv_files():
     repo_api = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/"
-    response = requests.get(repo_api)
+    response = requests.get(repo_api, headers={"Cache-Control": "no-cache"})  # Force fresh response
 
     if response.status_code == 200:
         files = response.json()
         csv_files = [file['name'] for file in files if file['name'].endswith('.csv')]
         return csv_files
     else:
-        st.error("Failed to fetch CSV files from GitHub.")
+        st.error("⚠️ Failed to fetch CSV files from GitHub. Make sure the repository exists and is public.")
         return []
 
 # Function to load CSV from GitHub
@@ -45,7 +44,7 @@ def load_data_from_github(file_name):
     if response.status_code == 200:
         return pd.read_csv(StringIO(response.text))
     else:
-        st.error(f"Failed to load dataset: {file_name} from GitHub.")
+        st.error(f"❌ Failed to load dataset: {file_name} from GitHub.")
         return None
 
 # Function to preprocess data
@@ -116,30 +115,36 @@ def train_dnn(X_train, X_test, y_train, y_test):
 st.sidebar.header("Step 1: Select or Upload Dataset")
 dataset_source = st.sidebar.radio("Choose dataset source:", ["Select from GitHub", "Upload a file"])
 
-df = None  # Initialize empty dataframe
+# Initialize session state to store dataset
+if "df" not in st.session_state:
+    st.session_state.df = None
 
 if dataset_source == "Select from GitHub":
     csv_files = get_github_csv_files()
-    selected_file = st.sidebar.selectbox("Available Datasets:", csv_files)
+    if not csv_files:
+        st.sidebar.warning("No CSV files found in GitHub repository. Try refreshing or uploading new datasets.")
+    selected_file = st.sidebar.selectbox("Available Datasets:", csv_files if csv_files else ["No files found"])
 
 elif dataset_source == "Upload a file":
     uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
 
 # Button to confirm dataset selection
 if st.sidebar.button("Load Dataset"):
-    if dataset_source == "Select from GitHub" and selected_file:
-        df = load_data_from_github(selected_file)
-        st.success(f"Loaded dataset: {selected_file}")
+    if dataset_source == "Select from GitHub" and selected_file and selected_file != "No files found":
+        st.session_state.df = load_data_from_github(selected_file)
+        if st.session_state.df is not None:
+            st.success(f"✅ Loaded dataset: {selected_file}")
     elif dataset_source == "Upload a file" and uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        st.success("Uploaded custom dataset!")
+        st.session_state.df = pd.read_csv(uploaded_file)
+        st.success("✅ Uploaded custom dataset!")
     else:
-        st.warning("Please select a dataset first.")
+        st.warning("⚠️ Please select a dataset first.")
 
 # Training section (only appears if dataset is loaded)
-if df is not None:
+if st.session_state.df is not None:
     st.sidebar.header("Step 2: Train Models")
     if st.sidebar.button("Start Training"):
+        df = st.session_state.df  # Get the stored dataset
         X, y = preprocess_data(df)
 
         # Handle class imbalance using SMOTE
@@ -150,19 +155,19 @@ if df is not None:
         X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
 
         # Train ML models
-        st.write("Training machine learning models, please wait...")
+        st.write("🚀 Training machine learning models, please wait...")
         model_results = train_models(X_train, X_test, y_train, y_test)
 
-        st.subheader("Evaluation Results for Machine Learning Models")
+        st.subheader("🔍 Evaluation Results for Machine Learning Models")
         for model, metrics in model_results.items():
             st.write(f"**{model}**")
             st.write(metrics)
 
         # Train and evaluate DNN
-        st.write("Training deep learning model, please wait...")
+        st.write("🧠 Training deep learning model, please wait...")
         dnn_results = train_dnn(X_train, X_test, y_train, y_test)
 
-        st.subheader("Evaluation Results for Deep Neural Network")
+        st.subheader("📊 Evaluation Results for Deep Neural Network")
         st.write(dnn_results)
 
-        st.success("Training & Evaluation Completed! 🎉")
+        st.success("🎉 Training & Evaluation Completed!")
