@@ -24,7 +24,7 @@ def load_data():
     return X, y
 
 # Train and evaluate models
-def train_models(X_train, X_test, y_train, y_test):
+def train_models(X_train, X_test, y_train, y_test): 
     classifiers = {
         'AdaBoost': AdaBoostClassifier(),
         'Gradient Boosting': GradientBoostingClassifier(),
@@ -93,9 +93,13 @@ X, y = load_data()
 feature_names = [f'feature_{i}' for i in range(X.shape[1])]  # Auto-generate feature names
 X = pd.DataFrame(X, columns=feature_names)
 
-# Standardize numerical features
+# Identify numerical columns
+num_cols = X.select_dtypes(exclude=['object']).columns  # Select numeric columns
+
+# Standardize only numerical features
 scaler = StandardScaler()
-X[num_cols] = scaler.fit_transform(X[num_cols])
+X[num_cols] = scaler.fit_transform(X[num_cols])  # Now it works
+
 
 # Handle imbalance
 smote = SMOTE()
