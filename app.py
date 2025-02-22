@@ -113,54 +113,56 @@ def train_dnn(X_train, X_test, y_train, y_test):
     }
 
 # Sidebar: Dataset selection
-st.sidebar.header("Select or Upload Dataset")
+st.sidebar.header("Step 1: Select or Upload Dataset")
 dataset_source = st.sidebar.radio("Choose dataset source:", ["Select from GitHub", "Upload a file"])
 
 df = None  # Initialize empty dataframe
 
 if dataset_source == "Select from GitHub":
     csv_files = get_github_csv_files()
-    
-    if csv_files:
-        selected_file = st.sidebar.selectbox("Available Datasets:", csv_files)
-        if selected_file:
-            df = load_data_from_github(selected_file)
-            st.success(f"Loaded dataset: {selected_file}")
-    else:
-        st.warning("No CSV files found in GitHub repository.")
+    selected_file = st.sidebar.selectbox("Available Datasets:", csv_files)
 
 elif dataset_source == "Upload a file":
     uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
-    
-    if uploaded_file is not None:
+
+# Button to confirm dataset selection
+if st.sidebar.button("Load Dataset"):
+    if dataset_source == "Select from GitHub" and selected_file:
+        df = load_data_from_github(selected_file)
+        st.success(f"Loaded dataset: {selected_file}")
+    elif dataset_source == "Upload a file" and uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         st.success("Uploaded custom dataset!")
+    else:
+        st.warning("Please select a dataset first.")
 
-# Process the dataset if loaded
+# Training section (only appears if dataset is loaded)
 if df is not None:
-    X, y = preprocess_data(df)
+    st.sidebar.header("Step 2: Train Models")
+    if st.sidebar.button("Start Training"):
+        X, y = preprocess_data(df)
 
-    # Handle class imbalance using SMOTE
-    smote = SMOTE()
-    X_resampled, y_resampled = smote.fit_resample(X, y)
+        # Handle class imbalance using SMOTE
+        smote = SMOTE()
+        X_resampled, y_resampled = smote.fit_resample(X, y)
 
-    # Split dataset
-    X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+        # Split dataset
+        X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
 
-    # Train ML models
-    st.write("Training machine learning models, please wait...")
-    model_results = train_models(X_train, X_test, y_train, y_test)
+        # Train ML models
+        st.write("Training machine learning models, please wait...")
+        model_results = train_models(X_train, X_test, y_train, y_test)
 
-    st.subheader("Evaluation Results for Machine Learning Models")
-    for model, metrics in model_results.items():
-        st.write(f"**{model}**")
-        st.write(metrics)
+        st.subheader("Evaluation Results for Machine Learning Models")
+        for model, metrics in model_results.items():
+            st.write(f"**{model}**")
+            st.write(metrics)
 
-    # Train and evaluate DNN
-    st.write("Training deep learning model, please wait...")
-    dnn_results = train_dnn(X_train, X_test, y_train, y_test)
+        # Train and evaluate DNN
+        st.write("Training deep learning model, please wait...")
+        dnn_results = train_dnn(X_train, X_test, y_train, y_test)
 
-    st.subheader("Evaluation Results for Deep Neural Network")
-    st.write(dnn_results)
+        st.subheader("Evaluation Results for Deep Neural Network")
+        st.write(dnn_results)
 
-    st.success("Training & Evaluation Completed! 🎉")
+        st.success("Training & Evaluation Completed! 🎉")
