@@ -1,1 +1,11 @@
-sklearn
+streamlit
+pandas
+numpy
+scikit-learn
+imblearn
+xgboost
+lightgbm
+catboost
+tensorflow
+matplotlib
+seaborn
