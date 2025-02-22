@@ -114,8 +114,19 @@ st.sidebar.header("Upload Student Data")
 uploaded_file = st.sidebar.file_uploader("Upload a CSV file for prediction", type=["csv"])
 if uploaded_file is not None:
     user_data = pd.read_csv(uploaded_file)
-    user_data = scaler.transform(user_data)
-    model = XGBClassifier()
-    model.fit(X_train, y_train)
-    prediction = model.predict(user_data)
-    st.write("Predicted Class:", prediction)
+
+    # Ensure uploaded data has same features as training data
+    expected_columns = X_train.shape[1]  # Number of features used in training
+
+    if user_data.shape[1] != expected_columns:
+        st.error(f"Uploaded file has {user_data.shape[1]} features, but expected {expected_columns}. Please check your file.")
+    else:
+        user_data = scaler.transform(user_data)  # Transform with the same scaler
+
+        # Load trained model and predict
+        model = XGBClassifier()
+        model.fit(X_train, y_train)  # Train model (consider saving/loading model instead)
+        prediction = model.predict(user_data)
+
+        st.write("Predicted Class:", prediction)
+
