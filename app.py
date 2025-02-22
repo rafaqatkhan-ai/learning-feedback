@@ -11,20 +11,37 @@ import lightgbm as lgb
 from catboost import CatBoostClassifier
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Conv1D, LSTM, SimpleRNN, Flatten
+from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
-# Load Data
-@st.cache_data
-def load_data():
-    file_path = "student_prediction.csv"
-    df = pd.read_csv(file_path)
-    X = df.iloc[:, :-1].values.astype(np.float32)  # Features
-    y = df.iloc[:, -1].values.astype(np.int64)  # Target
+st.title("Student Performance Prediction App 🎓")
+
+# Function to preprocess data
+def preprocess_data(df):
+    # Separate features (X) and target (y)
+    X = df.iloc[:, :-1]
+    y = df.iloc[:, -1]
+
+    # Identify categorical and numerical columns
+    cat_cols = X.select_dtypes(include=['object']).columns
+    num_cols = X.select_dtypes(exclude=['object']).columns
+
+    # Standardize numerical features
+    scaler = StandardScaler()
+    X[num_cols] = scaler.fit_transform(X[num_cols])
+
+    # Encode categorical features
+    if len(cat_cols) > 0:
+        encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
+        X_cat = pd.DataFrame(encoder.fit_transform(X[cat_cols]))
+        X_cat.columns = encoder.get_feature_names_out(cat_cols)
+        X = X.drop(columns=cat_cols).reset_index(drop=True)
+        X = pd.concat([X, X_cat], axis=1)
+
     return X, y
 
-# Train and evaluate models
-def train_models(X_train, X_test, y_train, y_test): 
+# Function to train multiple models
+def train_models(X_train, X_test, y_train, y_test):
     classifiers = {
         'AdaBoost': AdaBoostClassifier(),
         'Gradient Boosting': GradientBoostingClassifier(),
@@ -37,128 +54,69 @@ def train_models(X_train, X_test, y_train, y_test):
     for name, clf in classifiers.items():
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred, average='weighted')
-        recall = recall_score(y_test, y_pred, average='weighted')
-        f1 = f1_score(y_test, y_pred, average='weighted')
 
         results[name] = {
-            "Accuracy": accuracy,
-            "Precision": precision,
-            "Recall": recall,
-            "F1 Score": f1
+            "Accuracy": accuracy_score(y_test, y_pred),
+            "Precision": precision_score(y_test, y_pred, average='weighted'),
+            "Recall": recall_score(y_test, y_pred, average='weighted'),
+            "F1 Score": f1_score(y_test, y_pred, average='weighted')
         }
-    
+
     return results
 
-# Train Neural Network Models
-def train_neural_networks(X_train, X_test, y_train, y_test):
-    models = {
-        'DNN': Sequential([
-            Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
-            Dropout(0.3),
-            Dense(64, activation='relu'),
-            Dense(len(np.unique(y_train)), activation='softmax')
-        ])
+# Function to train a DNN model
+def train_dnn(X_train, X_test, y_train, y_test):
+    model = Sequential([
+        Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
+        Dropout(0.3),
+        Dense(64, activation='relu'),
+        Dense(len(np.unique(y_train)), activation='softmax')
+    ])
+
+    model.compile(optimizer=Adam(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.fit(X_train, y_train, epochs=50, batch_size=16, verbose=0, validation_split=0.2)
+
+    y_pred = np.argmax(model.predict(X_test), axis=1)
+
+    return {
+        "Accuracy": accuracy_score(y_test, y_pred),
+        "Precision": precision_score(y_test, y_pred, average='weighted'),
+        "Recall": recall_score(y_test, y_pred, average='weighted'),
+        "F1 Score": f1_score(y_test, y_pred, average='weighted')
     }
 
-    results = {}
+# File upload section
+st.sidebar.header("Upload Student Data for Training")
+uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
 
-    for name, model in models.items():
-        model.compile(optimizer=Adam(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-        model.fit(X_train, y_train, epochs=50, batch_size=16, verbose=0, validation_split=0.2)
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
+    st.write("Data Loaded Successfully!")
 
-        y_pred = np.argmax(model.predict(X_test), axis=1)
-        accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred, average='weighted')
-        recall = recall_score(y_test, y_pred, average='weighted')
-        f1 = f1_score(y_test, y_pred, average='weighted')
+    # Preprocess data
+    X, y = preprocess_data(df)
 
-        results[name] = {
-            "Accuracy": accuracy,
-            "Precision": precision,
-            "Recall": recall,
-            "F1 Score": f1
-        }
-    
-    return results
+    # Handle class imbalance using SMOTE
+    smote = SMOTE()
+    X_resampled, y_resampled = smote.fit_resample(X, y)
 
-# Streamlit App
-st.title("Student Performance Prediction App 🎓")
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
 
-# Load Data
-X, y = load_data()
-
-# Convert to DataFrame with column names
-feature_names = [f'feature_{i}' for i in range(X.shape[1])]  # Auto-generate feature names
-X = pd.DataFrame(X, columns=feature_names)
-
-# Identify numerical columns
-num_cols = X.select_dtypes(exclude=['object']).columns  # Select numeric columns
-
-# Standardize only numerical features
-scaler = StandardScaler()
-X[num_cols] = scaler.fit_transform(X[num_cols])  # Now it works
-
-
-# Handle imbalance
-smote = SMOTE()
-X_smote, y_smote = smote.fit_resample(X, y)
-
-# Split dataset
-X_train, X_test, y_train, y_test = train_test_split(X_smote, y_smote, test_size=0.2, random_state=42)
-
-
-# Model Training and Evaluation
-if st.button("Train Models"):
-    st.write("Training models, please wait...")
+    # Train machine learning models
+    st.write("Training machine learning models, please wait...")
     model_results = train_models(X_train, X_test, y_train, y_test)
 
-    st.subheader("Model Evaluation Results")
+    st.subheader("Evaluation Results for Machine Learning Models")
     for model, metrics in model_results.items():
         st.write(f"**{model}**")
         st.write(metrics)
 
-    nn_results = train_neural_networks(X_train, X_test, y_train, y_test)
-    st.subheader("Neural Network Performance")
-    for model, metrics in nn_results.items():
-        st.write(f"**{model}**")
-        st.write(metrics)
+    # Train and evaluate Deep Neural Network
+    st.write("Training deep learning model, please wait...")
+    dnn_results = train_dnn(X_train, X_test, y_train, y_test)
 
-st.sidebar.header("Upload Student Data")
-uploaded_file = st.sidebar.file_uploader("Upload a CSV file for prediction", type=["csv"])
-if uploaded_file is not None:
-    user_data = pd.read_csv(uploaded_file)
+    st.subheader("Evaluation Results for Deep Neural Network")
+    st.write(dnn_results)
 
-    # Separate features (X_user) and target (y_user)
-    X_user = user_data.iloc[:, :-1]  # All except the last column
-    y_user = user_data.iloc[:, -1]   # Target column (ignored in prediction)
-
-    # Identify categorical and numerical columns
-    cat_cols = X_user.select_dtypes(include=['object']).columns  # Categorical
-    num_cols = X_user.select_dtypes(exclude=['object']).columns  # Numerical
-
-    # Ensure numerical columns match training data
-    common_num_cols = list(set(num_cols) & set(X_train.columns))  # Fixes error
-    if common_num_cols:
-        X_user[common_num_cols] = scaler.transform(X_user[common_num_cols])  # Scale only matching features
-
-    # Encode categorical features
-    if len(cat_cols) > 0:
-        encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
-        X_user_cat = pd.DataFrame(encoder.fit_transform(X_user[cat_cols]))  
-        X_user_cat.columns = encoder.get_feature_names_out(cat_cols)  
-        X_user = X_user.drop(columns=cat_cols).reset_index(drop=True)  
-        X_user = pd.concat([X_user, X_user_cat], axis=1)  
-
-
-
-    # Align features with trained model (fill missing with 0)
-    X_user = X_user.reindex(columns=X_train.columns, fill_value=0)
-
-    # Train & Predict
-    model = XGBClassifier()
-    model.fit(X_train, y_train)  
-    predictions = model.predict(X_user)
-
-    st.write("Predicted Class:", predictions)
+    st.success("Training & Evaluation Completed! 🎉")
