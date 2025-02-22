@@ -144,14 +144,12 @@ if uploaded_file is not None:
         X_user[common_num_cols] = scaler.transform(X_user[common_num_cols])  # Scale only matching features
 
     # Encode categorical features
-if cat_cols:  # This ensures it checks for non-empty lists
-    encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)  # Fix deprecated argument
-    X_user_cat = encoder.fit_transform(X_user[cat_cols])  
-    X_user_cat = pd.DataFrame(X_user_cat, columns=encoder.get_feature_names_out(cat_cols))  
-
-    # Drop original categorical columns & concatenate the encoded ones
-    X_user = X_user.drop(columns=cat_cols).reset_index(drop=True)  
-    X_user = pd.concat([X_user, X_user_cat], axis=1)  
+    if len(cat_cols) > 0:
+        encoder = OneHotEncoder(handle_unknown='ignore', sparse=False)
+        X_user_cat = pd.DataFrame(encoder.fit_transform(X_user[cat_cols]))  
+        X_user_cat.columns = encoder.get_feature_names_out(cat_cols)  
+        X_user = X_user.drop(columns=cat_cols).reset_index(drop=True)  
+        X_user = pd.concat([X_user, X_user_cat], axis=1)  
 
 
 
