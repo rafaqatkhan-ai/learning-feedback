@@ -17,10 +17,7 @@ from tensorflow.keras.optimizers import Adam
 # GitHub repository details
 GITHUB_USER = "rafaqatkhan-ai"
 GITHUB_REPO = "learning-feedback"
-GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/main"  # Point to the 'main' directory
-
-# GitHub Personal Access Token (if repository is private)
-GITHUB_TOKEN = None  # Replace with your token if needed
+GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/"
 
 # Streamlit App Title
 st.title("📚 🎓 Khan-AcadPredict 🎓 📚")
@@ -63,41 +60,32 @@ if "df" not in st.session_state:
 # Load selected GitHub dataset
 if selected_github_csv != "None":
     st.session_state.df = pd.read_csv(selected_github_csv)
-    st.write(f"Loaded dataset from GitHub: {selected_github_csv}")
+    st.sidebar.success(f"Loaded dataset from GitHub: {selected_github_csv}")
 
 # Load uploaded dataset
 if uploaded_file is not None:
     st.session_state.df = pd.read_csv(uploaded_file)
-    st.write("Uploaded dataset loaded successfully!")
+    st.sidebar.success("Uploaded dataset loaded successfully!")
 
 # Check if a dataset is loaded
 if st.session_state.df is not None:
     df = st.session_state.df
     st.write("### Dataset Preview")
     st.write(df.head())
-    st.write("Dataset shape:", df.shape)
-    st.write("Dataset columns:", df.columns)
 
     # Function to preprocess data
     def preprocess_data(df):
-        st.write("Preprocessing data...")
-        X = df.iloc[:, :-1]  # Features
-        y = df.iloc[:, -1]   # Target
-
-        st.write("Features shape:", X.shape)
-        st.write("Target shape:", y.shape)
-        st.write("Unique target values:", np.unique(y))
+        X = df.iloc[:, :-1].copy()  # Ensure a copy is made to prevent warnings
+        y = df.iloc[:, -1].copy()
 
         # Identify categorical and numerical columns
         cat_cols = X.select_dtypes(include=['object']).columns
         num_cols = X.select_dtypes(exclude=['object']).columns
 
-        st.write("Categorical columns:", cat_cols)
-        st.write("Numerical columns:", num_cols)
-
         # Standardize numerical features
-        scaler = StandardScaler()
-        X[num_cols] = scaler.fit_transform(X[num_cols])
+        if len(num_cols) > 0:
+            scaler = StandardScaler()
+            X[num_cols] = scaler.fit_transform(X[num_cols])
 
         # Encode categorical features
         if len(cat_cols) > 0:
@@ -107,12 +95,10 @@ if st.session_state.df is not None:
             X = X.drop(columns=cat_cols).reset_index(drop=True)
             X = pd.concat([X, X_cat], axis=1)
 
-        st.write("Processed features shape:", X.shape)
         return X, y
 
     # Function to train multiple models
     def train_models(X_train, X_test, y_train, y_test):
-        st.write("Training models...")
         classifiers = {
             'AdaBoost': AdaBoostClassifier(),
             'Gradient Boosting': GradientBoostingClassifier(),
@@ -123,84 +109,76 @@ if st.session_state.df is not None:
         results = {}
 
         for name, clf in classifiers.items():
-            st.write(f"Training {name}...")
-            try:
-                clf.fit(X_train, y_train)
-                y_pred = clf.predict(X_test)
+            clf.fit(X_train, y_train)
+            y_pred = clf.predict(X_test)
 
-                results[name] = {
-                    "Accuracy": accuracy_score(y_test, y_pred),
-                    "Precision": precision_score(y_test, y_pred, average='weighted'),
-                    "Recall": recall_score(y_test, y_pred, average='weighted'),
-                    "F1 Score": f1_score(y_test, y_pred, average='weighted')
-                }
-            except Exception as e:
-                st.error(f"Error training {name}: {e}")
-                results[name] = {"Error": str(e)}
-
-        return results
-
-    # Function to train a Deep Neural Network
-    def train_dnn(X_train, X_test, y_train, y_test):
-        st.write("Training Deep Neural Network...")
-        try:
-            model = Sequential([
-                Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
-                Dropout(0.3),
-                Dense(64, activation='relu'),
-                Dense(len(np.unique(y_train)), activation='softmax')
-            ])
-
-            model.compile(optimizer=Adam(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-            model.fit(X_train, y_train, epochs=50, batch_size=16, verbose=0, validation_split=0.2)
-
-            y_pred = np.argmax(model.predict(X_test), axis=1)
-
-            return {
+            results[name] = {
                 "Accuracy": accuracy_score(y_test, y_pred),
                 "Precision": precision_score(y_test, y_pred, average='weighted'),
                 "Recall": recall_score(y_test, y_pred, average='weighted'),
                 "F1 Score": f1_score(y_test, y_pred, average='weighted')
             }
-        except Exception as e:
-            st.error(f"Error training DNN: {e}")
-            return {"Error": str(e)}
+
+        return results
+
+    # Function to train a Deep Neural Network
+    def train_dnn(X_train, X_test, y_train, y_test):
+        model = Sequential([
+            Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
+            Dropout(0.3),
+            Dense(64, activation='relu'),
+            Dense(len(np.unique(y_train)), activation='softmax')
+        ])
+
+        model.compile(optimizer=Adam(), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+        model.fit(X_train, y_train, epochs=50, batch_size=16, verbose=0, validation_split=0.2)
+
+        y_pred = np.argmax(model.predict(X_test), axis=1)
+
+        return {
+            "Accuracy": accuracy_score(y_test, y_pred),
+            "Precision": precision_score(y_test, y_pred, average='weighted'),
+            "Recall": recall_score(y_test, y_pred, average='weighted'),
+            "F1 Score": f1_score(y_test, y_pred, average='weighted')
+        }
 
     # Button to trigger training
     if st.button("Train Models"):
-        st.write("### Training in Progress... ⏳")
-        
-        try:
-            # Preprocess data
-            X, y = preprocess_data(df)
+        st.write("Starting training... ⏳")
 
-            # Handle class imbalance using SMOTE
-            if len(np.unique(y)) > 1:
+        try:
+            if df is None or df.empty:
+                st.error("No dataset is loaded. Please upload or select a dataset!")
+            else:
+                st.write(f"Dataset Shape: {df.shape}")
+                X, y = preprocess_data(df)
+
+                # Handle class imbalance using SMOTE
                 smote = SMOTE()
                 X_resampled, y_resampled = smote.fit_resample(X, y)
-            else:
-                st.warning("Only one class in the target variable. Skipping SMOTE.")
-                X_resampled, y_resampled = X, y
 
-            # Split data into training and testing sets
-            X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
+                # Split data into training and testing sets
+                X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=42)
 
-            # Train machine learning models
-            model_results = train_models(X_train, X_test, y_train, y_test)
+                st.write(f"Training Data Shape: {X_train.shape}, {y_train.shape}")
+                st.write(f"Testing Data Shape: {X_test.shape}, {y_test.shape}")
 
-            # Display results
-            st.subheader("Evaluation Results for Machine Learning Models")
-            for model, metrics in model_results.items():
-                st.write(f"**{model}**")
-                st.write(metrics)
+                # Train machine learning models
+                model_results = train_models(X_train, X_test, y_train, y_test)
 
-            # Train and evaluate Deep Neural Network
-            st.write("Training deep learning model, please wait... ⏳")
-            dnn_results = train_dnn(X_train, X_test, y_train, y_test)
+                # Display results
+                st.subheader("Evaluation Results for Machine Learning Models")
+                for model, metrics in model_results.items():
+                    st.write(f"**{model}**")
+                    st.write(metrics)
 
-            st.subheader("Evaluation Results for Deep Neural Network")
-            st.write(dnn_results)
+                # Train and evaluate Deep Neural Network
+                st.write("Training deep learning model, please wait... ⏳")
+                dnn_results = train_dnn(X_train, X_test, y_train, y_test)
 
-            st.success("🎉 Training Completed Successfully!")
+                st.subheader("Evaluation Results for Deep Neural Network")
+                st.write(dnn_results)
+
+                st.success("🎉 Training Completed Successfully!")
         except Exception as e:
             st.error(f"An error occurred during training: {e}")
