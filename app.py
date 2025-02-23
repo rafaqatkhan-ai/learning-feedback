@@ -17,7 +17,10 @@ from tensorflow.keras.optimizers import Adam
 # GitHub repository details
 GITHUB_USER = "rafaqatkhan-ai"
 GITHUB_REPO = "learning-feedback"
-GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/"
+GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/main"  # Point to the 'main' directory
+
+# GitHub Personal Access Token (if repository is private)
+GITHUB_TOKEN = None  # Replace with your token if needed
 
 # Streamlit App Title
 st.title("📚 🎓 Khan-AcadPredict 🎓 📚")
@@ -25,7 +28,8 @@ st.title("📚 🎓 Khan-AcadPredict 🎓 📚")
 # Function to fetch CSV files from GitHub repository
 def fetch_github_csv_files():
     def fetch_files_from_path(path):
-        response = requests.get(f"{GITHUB_API_URL}{path}")
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
+        response = requests.get(f"{GITHUB_API_URL}/{path}", headers=headers)
         if response.status_code == 200:
             files = response.json()
             csv_files = []
@@ -39,7 +43,7 @@ def fetch_github_csv_files():
             st.error(f"Failed to fetch files from GitHub: {response.status_code}")
             return []
 
-    return fetch_files_from_path("main")  # Start from the 'main' directory
+    return fetch_files_from_path("")  # Start from the root of the 'main' directory
 
 # Load dataset (either from GitHub or uploaded file)
 st.sidebar.header("Select Dataset")
