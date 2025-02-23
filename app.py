@@ -26,24 +26,23 @@ GITHUB_TOKEN = None  # Replace with your token if needed
 st.title("📚 🎓 Khan-AcadPredict 🎓 📚")
 
 # Function to fetch CSV files from GitHub repository
+# GitHub API Request Fix
 def fetch_github_csv_files():
-    def fetch_files_from_path(path):
-        headers = {"Authorization": f"token {GITHUB_TOKEN}"} if GITHUB_TOKEN else {}
-        response = requests.get(f"{GITHUB_API_URL}/{path}", headers=headers)
+    repo_api_url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents"
+
+    try:
+        response = requests.get(repo_api_url)
         if response.status_code == 200:
             files = response.json()
-            csv_files = []
-            for file in files:
-                if file['type'] == 'file' and file['name'].endswith('.csv'):
-                    csv_files.append(file['download_url'])
-                elif file['type'] == 'dir':
-                    csv_files.extend(fetch_files_from_path(file['path']))
+            csv_files = [file['download_url'] for file in files if file['name'].endswith('.csv')]
             return csv_files
         else:
             st.error(f"Failed to fetch files from GitHub: {response.status_code}")
             return []
+    except Exception as e:
+        st.error(f"Error fetching files: {e}")
+        return []
 
-    return fetch_files_from_path("")  # Start from the root of the 'main' directory
 
 # Load dataset (either from GitHub or uploaded file)
 st.sidebar.header("Select Dataset")
