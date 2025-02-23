@@ -20,7 +20,7 @@ GITHUB_REPO = "learning-feedback"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/"
 
 # Streamlit App Title
-st.title("📚 🎓 Khan-AcadPredict 🎓 📚")
+st.title("📚 🎓 EduPredict 🎓 📚\n Boosting academic intelligence through AI")
 
 # Function to fetch CSV files from GitHub repository
 # GitHub API Request Fix
