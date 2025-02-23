@@ -72,15 +72,23 @@ if st.session_state.df is not None:
     df = st.session_state.df
     st.write("### Dataset Preview")
     st.write(df.head())
+    st.write("Dataset shape:", df.shape)
 
     # Function to preprocess data
     def preprocess_data(df):
+        st.write("Preprocessing data...")
         X = df.iloc[:, :-1]  # Features
         y = df.iloc[:, -1]   # Target
+
+        st.write("Features shape:", X.shape)
+        st.write("Target shape:", y.shape)
 
         # Identify categorical and numerical columns
         cat_cols = X.select_dtypes(include=['object']).columns
         num_cols = X.select_dtypes(exclude=['object']).columns
+
+        st.write("Categorical columns:", cat_cols)
+        st.write("Numerical columns:", num_cols)
 
         # Standardize numerical features
         scaler = StandardScaler()
@@ -94,10 +102,12 @@ if st.session_state.df is not None:
             X = X.drop(columns=cat_cols).reset_index(drop=True)
             X = pd.concat([X, X_cat], axis=1)
 
+        st.write("Processed features shape:", X.shape)
         return X, y
 
     # Function to train multiple models
     def train_models(X_train, X_test, y_train, y_test):
+        st.write("Training models...")
         classifiers = {
             'AdaBoost': AdaBoostClassifier(),
             'Gradient Boosting': GradientBoostingClassifier(),
@@ -108,6 +118,7 @@ if st.session_state.df is not None:
         results = {}
 
         for name, clf in classifiers.items():
+            st.write(f"Training {name}...")
             clf.fit(X_train, y_train)
             y_pred = clf.predict(X_test)
 
@@ -122,6 +133,7 @@ if st.session_state.df is not None:
 
     # Function to train a Deep Neural Network
     def train_dnn(X_train, X_test, y_train, y_test):
+        st.write("Training Deep Neural Network...")
         model = Sequential([
             Dense(128, activation='relu', input_shape=(X_train.shape[1],)),
             Dropout(0.3),
